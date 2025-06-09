@@ -226,22 +226,56 @@ useEffect(() => {
   {showComments && (
     <>
       <ul className="space-y-2 mb-4">
-        {ticket.comments && ticket.comments.length > 0 ? (
-          ticket.comments.map((c, i) => (
-            <li key={i} className="text-sm">
-              <span className="font-semibold">{c.by?.email || c.by}</span>
-              {": "}
-              <span>{c.text}</span>
-              {" "}
-              <span className="text-xs text-gray-500">
-                ({new Date(c.at).toLocaleString()})
-              </span>
-            </li>
-          ))
-        ) : (
-          <li className="text-sm text-gray-500">No comments yet.</li>
-        )}
-      </ul>
+  {ticket.comments && ticket.comments.length > 0 ? (
+    ticket.comments.map((c, i) => {
+      const user = JSON.parse(localStorage.getItem("user"));
+      const canDelete =
+        user?.role === "admin" || user?._id === c.by?._id || user?.email === c.by?.email;
+      return (
+        <li key={i} className="text-sm flex items-center justify-between">
+          <span>
+            <span className="font-semibold">{c.by?.email || c.by}</span>
+            {": "}
+            <span>{c.text}</span>
+            {" "}
+            <span className="text-xs text-gray-500">
+              ({new Date(c.at).toLocaleString()})
+            </span>
+          </span>
+          {canDelete && (
+            <button
+              className="ml-2 text-red-500 hover:text-red-700"
+              title="Delete comment"
+              onClick={async () => {
+                if (!window.confirm("Delete this comment?")) return;
+                const token = localStorage.getItem("token");
+                const res = await fetch(
+                  `${import.meta.env.VITE_SERVER_URL}/tickets/${ticket._id}/comment/${c._id}`,
+                  {
+                    method: "DELETE",
+                    headers: {
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                );
+                const data = await res.json();
+                if (res.ok) {
+                  setTicket(data.ticket);
+                } else {
+                  alert(data.message || "Failed to delete comment");
+                }
+              }}
+            >
+              ×
+            </button>
+          )}
+        </li>
+      );
+    })
+  ) : (
+    <li className="text-sm text-gray-500">No comments yet.</li>
+  )}
+</ul>
       {(JSON.parse(localStorage.getItem("user"))?.role === "admin" ||
         JSON.parse(localStorage.getItem("user"))?.email === ticket.assignedTo?.email ||
         JSON.parse(localStorage.getItem("user"))?._id === ticket.createdBy) && (
@@ -299,45 +333,52 @@ useEffect(() => {
   {showHistory && (
     <ul className="space-y-2">
       {ticket.history
-        .slice()
-        .sort((a, b) => new Date(a.at) - new Date(b.at))
-        .map((h, i) => (
-          <li key={i} className="text-sm">
-            <span className="font-semibold">
-              {h.action === "status_update" && "Status changed"}
-              {h.action === "reassignment" && "Reassigned"}
-              {h.action === "comment" && "Commented"}
-            </span>
-            {" by "}
-            <span className="font-mono">{h.by?.email || h.by}</span>
-            {h.action === "status_update" && (
-              <>
-                {" from "}
-                <span className="font-mono">{h.from}</span>
-                {" to "}
-                <span className="font-mono">{h.to}</span>
-              </>
-            )}
-            {h.action === "reassignment" && (
-              <>
-                {" from "}
-                <span className="font-mono">{h.from}</span>
-                {" to "}
-                <span className="font-mono">{h.to}</span>
-              </>
-            )}
-            {h.action === "comment" && (
-              <>
-                {": "}
-                <span>{h.to}</span>
-              </>
-            )}
-            {" "}
-            <span className="text-xs text-gray-500">
-              ({new Date(h.at).toLocaleString()})
-            </span>
-          </li>
-        ))}
+  .slice()
+  .sort((a, b) => new Date(a.at) - new Date(b.at))
+  .map((h, i) => (
+    <li key={i} className="text-sm">
+      <span className="font-semibold">
+        {h.action === "status_update" && "Status changed"}
+        {h.action === "reassignment" && "Reassigned"}
+        {h.action === "comment" && "Commented"}
+        {h.action === "delete_comment" && "Deleted comment"}
+      </span>
+      {" by "}
+      <span className="font-mono">{h.by?.email || h.by}</span>
+      {h.action === "status_update" && (
+        <>
+          {" from "}
+          <span className="font-mono">{h.from}</span>
+          {" to "}
+          <span className="font-mono">{h.to}</span>
+        </>
+      )}
+      {h.action === "reassignment" && (
+        <>
+          {" from "}
+          <span className="font-mono">{h.from}</span>
+          {" to "}
+          <span className="font-mono">{h.to}</span>
+        </>
+      )}
+      {h.action === "comment" && (
+        <>
+          {": "}
+          <span>{h.to}</span>
+        </>
+      )}
+      {h.action === "delete_comment" && (
+        <>
+          {": "}
+          <span className="italic text-red-400">{h.from}</span>
+        </>
+      )}
+      {" "}
+      <span className="text-xs text-gray-500">
+        ({new Date(h.at).toLocaleString()})
+      </span>
+    </li>
+  ))}
     </ul>
   )}
 </div>

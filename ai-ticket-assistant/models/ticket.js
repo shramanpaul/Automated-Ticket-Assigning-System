@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+const commentSchema = new mongoose.Schema({
+  by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  text: String,
+  at: { type: Date, default: Date.now }
+}, { _id: true });
+
 const ticketSchema = new mongoose.Schema({
   title: String,
   description: String,
@@ -16,13 +22,7 @@ const ticketSchema = new mongoose.Schema({
   relatedSkills: [String],
   createdAt: { type: Date, default: Date.now },
   
-  comments: [
-    {
-      by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-      text: String,
-      at: { type: Date, default: Date.now }
-    }
-  ],
+  comments: [commentSchema],
   
   history: [
     {

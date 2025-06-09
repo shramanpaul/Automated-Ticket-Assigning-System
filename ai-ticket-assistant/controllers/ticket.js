@@ -166,3 +166,57 @@ export const addComment = async (req, res) => {
     res.status(500).json({ message: "Failed to add comment", details: error.message });
   }
 };
+
+export const deleteComment = async (req, res) => {
+  try {
+    console.log("Ticket ID:", req.params.id);
+    console.log("Comment ID:", req.params.commentId);
+    console.log("User:", req.user);
+
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      console.log("Ticket not found");
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    const comment = ticket.comments.id(req.params.commentId);
+    if (!comment) {
+      console.log("Comment not found in ticket.comments:", ticket.comments.map(c => c._id));
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    // Only admin or comment author can delete
+    if (
+      req.user.role !== "admin" &&
+      String(comment.by) !== String(req.user._id)
+    ) {
+      console.log("Not authorized");
+      return res.status(403).json({ message: "Not authorized" });
+    }
+      // Log the deletion in history
+      ticket.history.push({
+      action: "delete_comment",
+      by: req.user._id,
+      from: comment.text,
+      to: "",
+      at: new Date()
+    });
+    
+    // Remove the comment by filtering
+    ticket.comments = ticket.comments.filter(
+      c => String(c._id) !== String(req.params.commentId)
+    );
+
+    ticket.history = ticket.history.filter(
+      h => !(h.action === "comment" && h.to === comment.text && String(h.by) === String(comment.by))
+    );
+
+    await ticket.save();
+    await ticket.populate("comments.by", ["email", "_id"]);
+    await ticket.populate("history.by", ["email", "_id"]);
+    res.json({ ticket });
+  } catch (error) {
+    console.error("Delete comment error:", error);
+    res.status(500).json({ message: "Delete failed", details: error.message });
+  }
+};
