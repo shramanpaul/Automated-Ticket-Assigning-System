@@ -15,7 +15,7 @@ export const onTicketCreated = inngest.createFunction(
       //fetch ticket from DB
       const ticket = await step.run("fetch-ticket", async () => {
         const ticketObject = await Ticket.findById(ticketId);
-        if (!ticket) {
+        if (!ticketObject) {
           throw new NonRetriableError("Ticket not found");
         }
         return ticketObject;
@@ -27,28 +27,33 @@ export const onTicketCreated = inngest.createFunction(
 
       const aiResponse = await analyzeTicket(ticket);
 
-      const relatedskills = await step.run("ai-processing", async () => {
-        let skills = [];
-        if (aiResponse) {
-          await Ticket.findByIdAndUpdate(ticket._id, {
-            priority: !["low", "medium", "high"].includes(aiResponse.priority)
-              ? "medium"
-              : aiResponse.priority,
-            helpfulNotes: aiResponse.helpfulNotes,
-            status: "IN_PROGRESS",
-            relatedSkills: aiResponse.relatedSkills,
-          });
-          skills = aiResponse.relatedSkills;
-        }
-        return skills;
-      });
+const relatedskills = await step.run("ai-processing", async () => {
+  let skills = [];
+  if (aiResponse && Array.isArray(aiResponse.relatedSkills)) {
+    await Ticket.findByIdAndUpdate(ticket._id, {
+      priority: !["low", "medium", "high"].includes(aiResponse.priority)
+        ? "medium"
+        : aiResponse.priority,
+      helpfulNotes: aiResponse.helpfulNotes,
+      status: "IN_PROGRESS",
+      relatedSkills: aiResponse.relatedSkills,
+    });
+    skills = aiResponse.relatedSkills;
+  } else {
+    // fallback: update status only
+    await Ticket.findByIdAndUpdate(ticket._id, {
+      status: "IN_PROGRESS",
+    });
+  }
+  return skills;
+});
 
       const moderator = await step.run("assign-moderator", async () => {
         let user = await User.findOne({
           role: "moderator",
           skills: {
             $elemMatch: {
-              $regex: relatedskills.join("|"),
+              $regex: (relatedskills && relatedskills.length > 0) ? relatedskills.join("|") : "",
               $options: "i",
             },
           },
@@ -64,7 +69,7 @@ export const onTicketCreated = inngest.createFunction(
         return user;
       });
 
-      await setp.run("send-email-notification", async () => {
+      await step.run("send-email-notification", async () => {
         if (moderator) {
           const finalTicket = await Ticket.findById(ticket._id);
           await sendMail(

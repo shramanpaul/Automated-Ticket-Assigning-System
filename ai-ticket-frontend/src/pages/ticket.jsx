@@ -23,6 +23,7 @@ export default function TicketDetailsPage() {
         const data = await res.json();
         if (res.ok) {
           setTicket(data.ticket);
+          console.log("Ticket from backend:", data.ticket); // Add this line
         } else {
           alert(data.message || "Failed to fetch ticket");
         }
@@ -91,6 +92,9 @@ export default function TicketDetailsPage() {
             )}
           </>
         )}
+    <pre style={{ color: "white", background: "black" }}>
+      {JSON.stringify(ticket, null, 2)}
+    </pre>
       </div>
     </div>
   );

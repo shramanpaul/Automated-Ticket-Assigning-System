@@ -49,15 +49,29 @@ Ticket information:
 - Title: ${ticket.title}
 - Description: ${ticket.description}`);
 
-  const raw = response.output[0].context;
+  // Defensive checks
+  let raw;
+  if (
+    response &&
+    response.output &&
+    Array.isArray(response.output) &&
+    response.output[0] &&
+    typeof response.output[0].content === "string"
+  ) {
+    raw = response.output[0].content;
+  } else {
+    console.log("AI response is missing or malformed:", response);
+    return null;
+  }
 
   try {
+    let jsonString;
     const match = raw.match(/```json\s*([\s\S]*?)\s*```/i);
-    const jsonString = match ? match[1] : raw.trim();
+    jsonString = match ? match[1] : raw.trim();
     return JSON.parse(jsonString);
   } catch (e) {
-    console.log("Failed to parse JSON from AI response" + e.message);
-    return null; // watch out for this
+    console.log("Failed to parse JSON from AI response: " + e.message);
+    return null;
   }
 };
 
