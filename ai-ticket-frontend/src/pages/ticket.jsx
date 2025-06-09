@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import { jsonRef } from "react";
 
 export default function TicketDetailsPage() {
   const { id } = useParams();
@@ -41,19 +42,27 @@ export default function TicketDetailsPage() {
     fetchTicket();
   }, [id]);
 
-     useEffect(() => {
-    const fetchUsers = async () => {
-      const token = localStorage.getItem("token");
-      const user = JSON.parse(localStorage.getItem("user"));
-      if (user?.role !== "moderator" && user?.role !== "admin") return;
-      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setUsers(data.filter(u => u.role === "moderator"));
-    };
-    fetchUsers();
-  }, []);
+useEffect(() => {
+  const fetchUsers = async () => {
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user"));
+    if (user?.role !== "moderator" && user?.role !== "admin") return;
+    const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/auth/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    // Include both moderators and admins
+    setUsers(
+      data.filter(
+        u =>
+          (u.role === "moderator" || u.role === "admin")
+          // && u._id !== user._id //for assigning itself the ticket
+      )
+    );
+    console.log("Fetched Users: ", data);
+  };
+  fetchUsers();
+}, []);
 
   useEffect(() => {
   if (ticket?.status) setNewStatus(ticket.status);
@@ -112,11 +121,32 @@ export default function TicketDetailsPage() {
             )}
           </>
         )}
-    <pre style={{ color: "white", background: "black" }}>
+    <pre
+  ref={jsonRef}
+  style={{
+    color: "white",
+    background: "black",
+    overflow: "auto",
+    wordBreak: "break-all",
+    padding: "1em",
+    borderRadius: "0.5em",
+    maxHeight: "300px",
+    marginTop: "1em",
+    position: "relative"
+  }}
+>
       {JSON.stringify(ticket, null, 2)}
     </pre>
+    <button
+  className="btn btn-sm btn-outline mt-2"
+  onClick={() => {
+    navigator.clipboard.writeText(JSON.stringify(ticket, null, 2));
+  }}
+>
+  Copy JSON
+</button>
       </div>
-            {ticket.assignedTo && JSON.parse(localStorage.getItem("user"))?.email === ticket.assignedTo.email && (
+            {ticket.assignedTo && (JSON.parse(localStorage.getItem("user"))?.email === ticket.assignedTo.email || JSON.parse(localStorage.getItem("user"))?.role === "admin") && (
     <div className="mt-6 p-4 bg-base-200 rounded">
       <h3 className="font-bold mb-2">Update Ticket</h3>
       <form
@@ -159,7 +189,7 @@ export default function TicketDetailsPage() {
           </select>
         </div>
         <div>
-          <label className="block mb-1 font-semibold">Reassign To</label>
+          <label className="block mb-1 font-semibold">Reassign To (Moderator/Admin)</label>
           <select
             className="select select-bordered w-full"
             value={newAssignee}
