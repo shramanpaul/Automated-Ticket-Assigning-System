@@ -6,6 +6,9 @@ export default function TicketDetailsPage() {
   const { id } = useParams();
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [newStatus, setNewStatus] = useState(ticket?.status || "");
+  const [newAssignee, setNewAssignee] = useState("");
+  const [users, setUsers] = useState([]);
 
   const token = localStorage.getItem("token");
 
@@ -38,6 +41,24 @@ export default function TicketDetailsPage() {
     fetchTicket();
   }, [id]);
 
+     useEffect(() => {
+    const fetchUsers = async () => {
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (user?.role !== "moderator" && user?.role !== "admin") return;
+      const res = await fetch(`${import.meta.env.VITE_SERVER_URL}/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setUsers(data.filter(u => u.role === "moderator"));
+    };
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+  if (ticket?.status) setNewStatus(ticket.status);
+  }, [ticket]);
+
   if (loading)
     return <div className="text-center mt-10">Loading ticket details...</div>;
   if (!ticket) return <div className="text-center mt-10">Ticket not found</div>;
@@ -50,7 +71,6 @@ export default function TicketDetailsPage() {
         <h3 className="text-xl font-semibold">{ticket.title}</h3>
         <p>{ticket.description}</p>
 
-        {/* Conditionally render extended details */}
         {ticket.status && (
           <>
             <div className="divider">Metadata</div>
@@ -96,6 +116,69 @@ export default function TicketDetailsPage() {
       {JSON.stringify(ticket, null, 2)}
     </pre>
       </div>
+            {ticket.assignedTo && JSON.parse(localStorage.getItem("user"))?.email === ticket.assignedTo.email && (
+    <div className="mt-6 p-4 bg-base-200 rounded">
+      <h3 className="font-bold mb-2">Update Ticket</h3>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const token = localStorage.getItem("token");
+          const res = await fetch(
+            `${import.meta.env.VITE_SERVER_URL}/tickets/${ticket._id}`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                status: newStatus,
+                assignedTo: newAssignee || undefined,
+              }),
+            }
+          );
+          const data = await res.json();
+          if (res.ok) {
+            setTicket(data.ticket);
+            alert("Ticket updated!");
+          } else {
+            alert(data.message || "Update failed");
+          }
+        }}
+        className="space-y-3"
+      >
+        <div>
+          <label className="block mb-1 font-semibold">Status</label>
+          <select
+            className="select select-bordered w-full"
+            value={newStatus}
+            onChange={e => setNewStatus(e.target.value)}
+          >
+            <option value="IN_PROGRESS">IN_PROGRESS</option>
+            <option value="COMPLETED">COMPLETED</option>
+          </select>
+        </div>
+        <div>
+          <label className="block mb-1 font-semibold">Reassign To</label>
+          <select
+            className="select select-bordered w-full"
+            value={newAssignee}
+            onChange={e => setNewAssignee(e.target.value)}
+          >
+            <option value="">-- No Change --</option>
+            {users.map(u => (
+              <option key={u._id} value={u._id}>
+                {u.email}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button className="btn btn-primary" type="submit">
+          Update Ticket
+        </button>
+      </form>
+    </div>
+  )}
     </div>
   );
 }

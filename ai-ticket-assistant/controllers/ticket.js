@@ -82,3 +82,21 @@ export const getTicket = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+export const updateTicket = async (req, res) => {
+  try {
+    const { status, assignedTo } = req.body;
+    const update = {};
+    if (status) update.status = status;
+    if (assignedTo) update.assignedTo = assignedTo;
+    const ticket = await Ticket.findByIdAndUpdate(
+      req.params.id,
+      update,
+      { new: true }
+    ).populate("assignedTo", ["email", "_id"]);
+    if (!ticket) return res.status(404).json({ message: "Ticket not found" });
+    return res.json({ ticket });
+  } catch (error) {
+    res.status(500).json({ message: "Update failed", details: error.message });
+  }
+};
